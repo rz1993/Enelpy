@@ -4,6 +4,8 @@ import logging
 import random
 
 
+START = '<s>'
+
 class AveragedPerceptron:
     def __init__(self):
         self._weights = defaultdict(lambda : defaultdict(float))
@@ -60,6 +62,7 @@ class PerceptronTagger:
         self._custom_features = []
         self.logger =
         self.model = AveragedPerceptron()
+        self._START = START
 
     def _add_feature(self, (name, func)):
         self._custom_features.append((name, func))
