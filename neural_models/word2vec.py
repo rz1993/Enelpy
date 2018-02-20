@@ -12,17 +12,93 @@ Features:
     - Stop word subsampling
 '''
 from collections import Counter
+from collections import deque
+from itertools import islice
 
+import math
+import numpy as np
+import random
 import tensorflow as tf
 
 
 options = {}
 
-class Options:
-    pass
+def generate_words(docs, span=2):
+    '''
+    A (word, context) generator for training examples. This
+    is structured in a generator scheme so that memory footprint
+    is minimized.
 
-def generate_batch(options):
-    pass
+    :params docs: an iterable of documents, which are iterables of words
+    :params span: the `radius` of the word window
+    '''
+    window_size = span*2+1
+    center = span
+
+    for doc in docs:
+        '''
+        Using `deque` for context storage is much faster since we can
+        store and update the context quickly. Using slices for the window
+        is convenient since we may wish to subsample without passing through
+        all of the data.
+        '''
+        window = deque(
+            iterable=islice(doc, 0, window_size),
+            maxlen=window_size)
+
+        # Include the context pairs for the beginning edge words
+        for i in range(span):
+            for j in range(i+span):
+                yield (window[i], window[j])
+
+        for word in enumerate(doc):
+            for i in range(window_size):
+                if i != center:
+                    yield (window[center], window[i])
+            window.append(word)
+
+        # Include the context pairs for the ending edge words
+        for i in range(span+1, window_size):
+            for j in range(i-span, window_size):
+                yield (window[i], window[j])
+
+def generate_batch(docs, span=2, batch_size=100):
+    word_gen = generate_words(docs, span)
+    batch = islice(word_gen, 0, batch)
+    return batch
+
+
+class SampledReader:
+    def __init__(self, subsample=0.001):
+        self._subsample = subsample
+        self._fit = False
+        self.counts = []
+        self.word2idx = {}
+        self.vocab_size = 0
+
+    def count_words(self, docs):
+        word_gen = (w for doc in docs for w in doc)
+        word_counts = Counter(word_gen)
+
+        for i, word in enumerate(word_counts):
+            self._word2idx[word] = i
+            self._counts[i] = word_counts[word]
+
+        self.vocab_size = len(self.counts)
+        self._fit = True
+
+    def _include(self, word):
+        if word in self.word2idx:
+            c = self.counts[self.word2idx[word]]
+        else:
+            c = 1
+        p = math.sqrt(c/self._subsample+1)*self._subsample/c
+        return random.random() < p
+
+    def read(self, docs):
+        for doc in docs:
+            for w in doc:
+                if self._include(w): yield w
 
 
 class Word2Vec:
@@ -132,12 +208,3 @@ class Word2Vec:
         # TODO: Refactor naive implementation
         generator = (_normalize(w) for doc in corpus for w in doc)
         counts = Counter(generator)
-
-    def _collocate(self, words, counts):
-        pass
-
-    def _subsample(self, corpus, counts):
-        pass
-
-    def fit(self, corpus):
-        pass
