@@ -1,5 +1,10 @@
 '''
-UTF-8
+Simple Latent Dirichlet Allocation implementation with Collapsed Gibbs Sampling
+for inference. Scipy's sparse matrices are used for efficient parameter storage
+and updates.
+
+Based off of Gregor Heinrich's excellent tutorial:
+`Parameter estimation for text analysis`
 '''
 from collections import Counter
 from scipy.sparse import csr_matrix, dok_matrix
@@ -15,6 +20,11 @@ def normalize(word):
     return word.lower()
 
 class Docs:
+    '''
+    A simple document abstraction that builds and potentially reads from
+    disk for large sets of files. The class exposes a document generator,
+    each document of which is represented as a list of word ids.
+    '''
     def __init__(self, fpaths=None):
         self.fpaths = []
         self._word2idx = {}
@@ -111,9 +121,19 @@ class LDA:
         self._build_params(docs)
 
     def loglikelihood(self):
+        '''
+        Likelihood of a document:
+            - p(w_mi|wdist_t)*p(z_mi=t|zdist_m)*p(zdist_m|alpha)*p(wdist_t|beta)
+        Likelihood of a corpus is product of document likelihoods
+        '''
         pass
 
     def converged(self):
+        '''
+        Compute the loglikelihood of the corpus. If the change has not exceeded
+        some threshold then return True. Alternatively, also return True if
+        the number of iterations exceeds self.max_iter.
+        '''
         pass
 
     def fit(self, docs, verbose=False):
@@ -123,7 +143,7 @@ class LDA:
         assignments = self._init_assign(docs)
         _iter = 1
         while not self.converged():
-            for d, doc in enumerate(docs):
+            for d, doc in enumerate(docs.docs()):
                 doc_dist = self.get_doc_pdf(d)
 
                 for i, word_id in enumerate(doc):
@@ -137,6 +157,7 @@ class LDA:
                         self.get_doc_pdf(d))
                     new_topic = np.random.choice(self._ntopics,
                         p=topic_dist)
+                    assignments[d][i] = new_topic
                     self._add_count(d, word_id,
                                     new_topic,
                                     count=1)
