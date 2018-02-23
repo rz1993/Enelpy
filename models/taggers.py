@@ -60,7 +60,6 @@ class PerceptronTagger:
         self._features = set()
         self._weights = dict()
         self._custom_features = []
-        self.logger =
         self.model = AveragedPerceptron()
         self._START = START
 
