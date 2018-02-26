@@ -91,11 +91,39 @@ class TokenPreprocessor:
             chars.append(char_ids)
             words.append(word_ids)
 
-        result = words
+        if self.padding:
+            words = self.pad_sequences(words, vocab_words[PAD])
+            chars = self.pad_sequences(chars, vocab_chars[PAD], depth=2)
+
         if self.char_indices:
             result = (words, chars)
+        else:
+            result = words
 
         return result
+
+    def _pad_sequences(self, sequences, pad_tok, max_len):
+        for i, seq in enumerate(sequences):
+            pad_length = max_len-len(seq)
+            if pad_length > 0:
+                sequences[i] = seq[:max_len] + [pad_tok] * pad_length
+            else:
+                sequences[i] = seq[:max_len]
+        return sequences
+
+    def pad_sequences(self, sequences, pad_tok, depth=1):
+        if depth not in [1, 2]:
+            raise ValueError('Depth should be 1 or 2, not {}'.format(depth))
+
+        if depth == 1:
+            max_len = len(max(sequences, key=len))
+            sequences = self._pad_sequences(sequences, pad_tok, max_len)
+        else:
+            max_len = max((len(max(seqs, key=len)) for seqs in sequences))
+            for seqs in sequences:
+                self._pad_sequences(seqs, pad_tok, max_len)
+
+        return sequences
 
     def save(self, filename):
         joblib.dump(self, filename)
