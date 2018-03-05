@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import utils
 
 '''
 Based on
@@ -42,9 +43,10 @@ class NERTagger:
                                            trainable=False)
         self.char_embeddings.assign(embedding_input)
 
-    def _build_train(self, batch_size, timesteps, lstm_dim, lr):
+    def _build_train(self, lstm_dim, lr=0.001, batch_size=None, timesteps=None):
         vocab_size = self.vocab_size
         embed_size = self.embed_size
+        n_tags = self.n_tags
 
         label_ids = tf.placeholder(tf.int32, [batch_size, timesteps])
         word_ids = tf.placeholder(tf.int32, [batch_size, timesteps])
@@ -89,7 +91,7 @@ class NERTagger:
         into the shape [batch_size * timesteps, lstm_dim]. This assumes that all
         sequence dependent information has been captured by the Bi-LSTM.
         '''
-        contexts = tf.reshape(output, [-1, 2*lstm_dim])
+        contexts = tf.reshape(contexts, [-1, 2*lstm_dim])
         tag_energies = tf.layers.dense(inputs=contexts, units=n_tags)
         tag_energies = tf.reshape(tag_energies, [batch_size, timesteps, n_tags])
 
@@ -132,12 +134,85 @@ class NERTagger:
             self.tag_energies,
             self.transition)
 
+    def _validate_input(self, docs, batch_size=None):
+        if len(docs) < 2:
+            raise Exception('`docs` must be [`char_ids`, `word_ids`].')
+
+        if len(docs[0]) !== len(docs[1]):
+            raise Exception('`char_ids` and `word_ids` should be the same length.')
+
+        if batch_size and len(docs[0]) % batch_size != 0:
+            raise Exception('Number of documents should '
+                            'be divisible by `batch_size`.')
+
     def load_pretrained_embeddings(self):
         pass
 
-    def fit(self, docs,
+    def fit(self,
+            docs,
+            labels,
             batch_size=200,
             epochs=50,
             lstm_dim=200,
-            lr=0.001):
-        pass
+            lr=0.001,
+            validate=False,
+            val_every=100,
+            val_docs=None,
+            val_labels=None):
+        if not self._built:
+            self._build_train(lstm_dim, lr=lr)
+
+        self._validate_input(docs, batch_size)
+        all_char_ids, all_word_ids = batch_docs
+        n_batches = len(char_ids) // batch_size
+
+        if validate:
+            self._validate_input(val_docs)
+            if not val_labels:
+                raise Exception('`val_labels must be non-empty list of'
+                                '[`label_ids`] for cross validation.')
+            val_char_ids, val_word_ids = val_docs
+
+        with tf.Session() as sess:
+            init = tf.global_variables_initializer()
+            sess.run(init)
+
+            run_train = [self.loss, self.train_step]
+            run_eval = [self.pred_score]
+
+            _iter = 0
+            for epoch in range(epochs):
+                utils.shuffle(docs)
+
+                for i in range(n_batches):
+                    _iter += 1
+                    start, end = i*batch_size, (i+1)*batch_size
+                    char_ids = all_char_ids[start:end]
+                    word_ids = all_word_ids[start:end]
+                    label_ids = labels[start:end]
+
+                    loss, _ = sess.run(run_train,
+                        feed_dict={self.char_ids: char_ids,
+                                   self.word_ids: word_ids,
+                                   self.label_ids: label_ids})
+                    if validate and _iter % val_every == 0:
+                        val_score = sess.run(run_eval,
+                            feed_dict={self.char_ids: val_char_ids,
+                                       self.word_ids: val_word_ids,
+                                       self.label_ids: val_labels})
+                        print('Validation accuracy: {0:.4f}'.format(val_score))
+
+    def label(self, docs):
+        # TODO: Do we need to fit a separate transition matrix and store it?
+        self._validate_input(docs)
+        char_ids, word_ids = docs
+
+        with tf.Session() as sess:
+            init = tf.global_variables_initializer()
+            sess.run(init)
+
+            tags = sess.run(self.pred_tags,
+                feed_dict={self.char_ids: char_ids,
+                           self.word_ids: word_ids})
+
+        return tags

@@ -10,6 +10,14 @@ A series of natural language processing notebooks progressing from low-level tas
 - Sentiment and Topic Modeling `in progress`
 - Summarization `in progress`
 
+## Models Implemented
+- Averaged Perceptron POS tagger
+- Latent Dirichlet Allocation via Collapsed Gibbs Sampler
+
+## Neural Models
+- word2vec with negative sampling, subsampling and adjustable context windows
+- LSTM + Linear Chain CRF for named entity recognition
+
 ## Libraries and tools used
 - `spaCy` - for abstracting low level tasks in higher level ones
 - `scikit-learn` - for implementing feature extraction and machine learning models
