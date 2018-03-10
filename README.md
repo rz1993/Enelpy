@@ -1,5 +1,5 @@
-# Natural Language Processing Notebooks
-A series of natural language processing notebooks progressing from low-level tasks, such as stemming, lemmatization, POS-tagging, to high level tasks such as sentiment analysis and summarization. Introduces a variety of models for these tasks from rule-based to traditional ML models to RNNs.
+# Enelpy
+A series of natural language processing notebooks and implemented models for various tasks from low-level tasks, such as stemming, lemmatization, POS-tagging, to high level tasks such as sentiment analysis and summarization. Introduces a variety of models for these tasks from rule-based to traditional ML models to RNNs.
 
 ## Notebooks
 - Stemming and lemmatization `in progress`
